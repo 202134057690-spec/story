@@ -36,6 +36,7 @@ bible/      style.md · world.md · characters.md · plot.md
 templates/  short-story.md · chapter.md · fragment.md
 works/      عمل واحد لكل ملف — و index.md مولَّد
 tools/      story.py
+book/       الطبع: typeset.py · make_book.py · paratext.md · IMAGES.md
 ```
 
 ## دورة حياة العمل
@@ -50,3 +51,26 @@ tools/      story.py
 - [النسخة الخطأ](works/night-copy.md) — مسوّدة `draft` من نفس العالم.
 
 الفهرس المولَّد: [works/index.md](works/index.md).
+
+## الطبعة الجاهزة للطباعة
+
+نصّ القصة الذي يُطبع هو [works/one-attempt.md](works/one-attempt.md) نفسه — لا نسخة
+طباعة موازية تُحرَّر سرًّا. وحواشي الطبع (صفحة العنوان، الافتتاحية، الغلاف الخلفي،
+بيانات الطبع) في [book/paratext.md](book/paratext.md).
+
+```bash
+make book AUTHOR="نجمة برهان"      # أو: ~/.venv-book/bin/python book/make_book.py --author ...
+```
+
+**لا ملف PDF ولا صورة داخل git**: المستودع يحفظ النصّ والكود فقط
+([`AGENTS.md` § 2](AGENTS.md))، والناتج يُبنى خارجَه في `~/build/book/`:
+
+| الملف | المحتوى |
+|---|---|
+| `~/build/book/interior.pdf` | المتن — ١٦ صفحة A5، بلا علامات قصّ |
+| `~/build/book/cover.pdf` | غلاف مطوّيّ بوجهٍ واحد بنزيف ٣ مم |
+| `~/build/book/pages/` · `sheet.png` | معاينة كل صفحة + شيت كامل |
+| `~/build/book/qa.json` | ما ثُبِّت آليًا، وما لم يُثبَّت |
+
+التفاصيل والتبعيات في [book/README.md](book/README.md)، وأوامر توليد الرسوم في
+[book/IMAGES.md](book/IMAGES.md).
