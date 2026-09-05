@@ -341,22 +341,27 @@ def main(argv=None) -> int:
             T.render_pdf(cover_cv, os.path.join(args.out, "cover.pdf"), fonts, label="cover")
             T.render_png(cover_cv, os.path.join(args.out, "cover-pages"), fonts, dpi=args.dpi_preview)
 
-    low = {k: v for k, v in {**info["dpi"], **(cover_info or {})}.items()
-           if isinstance(v, int) and v < 240}
+    art_dpi = dict(info["dpi"])
+    if cover_info:
+        art_dpi["cover.png"] = cover_info["cover_dpi"]
+    low = {k: v for k, v in art_dpi.items() if isinstance(v, (int, float)) and v < 240}
     qa = {"title": info["title"], "story_file": os.path.relpath(args.story, REPO),
           "prose_words": info["words"], "interior_pages": info["pages"],
           "glyph_ops": body.total_glyphs(), "lines": info["flow"]["lines"],
           "widows_moved": info["flow"]["widows_moved"],
           "overfull_pt": round(info["flow"]["overfull"], 2),
           "loose_lines": info["flow"].get("loose_lines", 0),
-          "booklet_pad_pages": info["booklet_pad"], "art_dpi": info["dpi"], "art_below_240dpi": low, "cover": cover_info,
-          "page_mm": [148, 210], "margins_mm": [17, 17, 20, 18],
+          "booklet_pad_pages": info["booklet_pad"],
+          "art_dpi": art_dpi, "art_below_240dpi": low,
+          "cover": cover_info, "page_mm": [148, 210],
+          "margins_mm": [17, 17, 20, 18], "fonts_embedded_subset": True,
           "warnings": warnings,
           "not_checked": [
               "لا تحقيق تراصّ (imposition) لطابعة بعينها: الملف صفحات مفردة بحجمها الصافي",
               "بلا ملف ICC ولا علامات قصّ — تُضاف عند المصنع",
               "الرسوم توليد اصطناعي؛ حقوق الاستعمال التجاري على من يطبع",
-              "لم تُراجَع السطورُ الأخيرة بصريًا إلا على ١٨٠dpi"]}
+              "المراجعة البصرية: صفحة العنوان وأول المتن وبيانات الطبع على ٣٠٠dpi والغلاف على ٢٢٠dpi؛ "
+              "وبقية الصفحات فُحصت آليًا فقط (تجاوز العمود، الفضفاضة، الأرقيم)"]}
     with open(os.path.join(args.out, "qa.json"), "w", encoding="utf-8") as fh:
         json.dump(qa, fh, ensure_ascii=False, indent=2)
 
@@ -368,7 +373,7 @@ def main(argv=None) -> int:
               f"{cover_info['bleed_mm']}) · الكعب {cover_info['spine_mm']} مم لـ{cover_info['leaves']} ورقة")
     print(f"دقّة الرسوم dpi: {json.dumps(info['dpi'], ensure_ascii=False)}")
     if cover_info:
-        print(f"دقّة غلاف: {cover_info.get('cover_dpi')} dpi · أسطر فضْفاضة: "
+        print(f"دقّة غلاف: {cover_info.get('cover_dpi')} dpi · أسطر فضفاضة: "
               f"{info['flow'].get('loose_lines', 0)} · سطر مُتجاوز: "
               f"{info['flow'].get('overfull', 0):.2f}pt")
     print(f"الناتج: {args.out}")

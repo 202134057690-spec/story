@@ -30,7 +30,12 @@ MM = 72.0 / 25.4
 PT_PER_IN = 72.0
 
 ARABIC_LETTER = re.compile(r"[\u0621-\u064A\u0660-\u0669\u0671-\u06D3\u06FA-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]")
-WORD_CHAR = re.compile(r"[\u0621-\u064A\u0671-\u06D30-9A-Za-z]")
+WORD_CHAR = re.compile(r"[\u0621-\u064A\u0660-\u0669\u0671-\u06D30-9A-Za-z]")  # الأرقام العربية حروفٌ في سياق الترقيم: لا تُعامَل كرمز خالص
+# حرف عربي أو علامة تشكيل — الأرقام ليست كذلك: تسلسلها يقرأ من اليسار
+# إلى اليمين ولو وسط الكلام العربي (AN في خوارزمية bidi)، وعكسها يُخرج
+# «٨٤١» بدل «١٤».
+AR_LETTER = re.compile(r"[\u0621-\u064A\u0671-\u06D3\u06FA-\u06FF"
+                       r"\uFB50-\uFDFF\uFE70-\uFEFF\u064B-\u065F\u0670]")
 
 
 def read_front_matter(md: str):
@@ -154,15 +159,36 @@ def peel(word: str):
     return [p for p in (lead, word, trail) if p]
 
 
+def _script_runs(part: str):
+    """تقسيم القطعة إلى مقاطع نصّ واحد: عربيٌّ يُشكَّل من اليمين، وغيرُ عربيٍّ
+    (لاتينيّ أو رقم) من اليسار. هكذا يبقى `وbook/typeset.py` مقروءًا: الواو
+    في محلّها من الكلام، والاسم اللاتينيّ في ترتيبه، بلا عكسٍ داخلي.
+    الترقيمُ الخالص يُتْرك لاتجاه الفقرة لأنه يتدلّى من الكلام العربي."""
+    runs, cur, cur_ar = [], "", None
+    for ch in part:
+        ar = bool(AR_LETTER.match(ch))
+        if cur_ar is None or ar == cur_ar:
+            cur += ch
+            cur_ar = ar
+            continue
+        runs.append((cur, cur_ar))
+        cur, cur_ar = ch, ar
+    if cur:
+        runs.append((cur, cur_ar))
+    if len(runs) == 1 and not WORD_CHAR.search(part):
+        runs = [(part, True)]
+    return runs
+
+
 def shape_units(shapers: dict, text: str, size: float, font: str):
     """وحدات السطر: كل وحدة = قطع متلاصقة، والمسافات بين الوحدات لا داخلها."""
     units = []
     for raw in [w for w in re.split(r"\s+", text.strip()) if w]:
         pieces = []
         for part in peel(raw):
-            rtl = bool(ARABIC_LETTER.search(part)) or not WORD_CHAR.search(part)
-            glyphs, w = shapers[font].shape_rtl(part, size, rtl)
-            pieces.append({"g": glyphs, "w": w})
+            for run, rtl in _script_runs(part):
+                glyphs, w = shapers[font].shape_rtl(run, size, rtl)
+                pieces.append({"g": glyphs, "w": w})
         if pieces:
             units.append({"pieces": pieces, "w": sum(p["w"] for p in pieces)})
     return units
