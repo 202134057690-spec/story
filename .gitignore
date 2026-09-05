@@ -1,0 +1,31 @@
+# مخرجات وأدوات محلية
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+dist/
+build/
+
+# وسائط وثنائيات: هذا المستودع نصّي فقط (AGENTS.md § 2)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.pdf
+*.mp3
+*.wav
+*.mp4
+*.zip
+*.tar.gz
+
+# محررات
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# مسوّدات لا تُلتزَم بالنظام
+works/**/scratch-*.md
+*.bak
