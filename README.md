@@ -21,11 +21,12 @@ python3 tools/story.py lint && python3 tools/story.py index
 | `tools/story.py new <slug> --from <قالب>` | إنشاء عمل من قالب ببيانات أمامية صحيحة |
 | `tools/story.py lint [--strict]` | فحص المواصفة: الحقول، الأقسام، عتبات الحالة، الروابط المعطوبة |
 | `tools/story.py index [--dry-run]` | توليد `works/index.md` مرتّبًا بالحالة مع عدّ كلمات |
+| `tools/story.py review [--strict]` | فحص آلي لقواعد الأسلوب: جُمل طويلة، كليشيهات، وسوم انفعال، ترقيم لاتيني، ميزانية التشبيه |
 | `tools/story.py stats` | إجماليات سريعة |
 | `tools/story.py check-contradictions` | كشف التعارض بين «الحقائق» المسجّلة في `bible/` |
-| `tools/story.py self-test` | ٣١ فحصًا ذاتيًا للأداة نفسها — شغّله بعد أي تعديل عليها |
+| `tools/story.py self-test` | ٤٤ فحصًا ذاتيًا للأداة نفسها — شغّله بعد أي تعديل عليها |
 
-بلا اعتماديات: Python 3.8+ فقط. أو اختصارات عبر `make` (`make lint`, `make new SLUG=x`, `make check`).
+بلا اعتماديات: Python 3.8+ فقط. أو اختصارات عبر `make` (`make lint`, `make review`, `make new SLUG=x`, `make check`).
 
 ## البنية
 
@@ -45,4 +46,7 @@ tools/      story.py
 
 ## الحالة الحالية
 
-مثال مؤسِّس واحد: [النسخة الخطأ](works/night-copy.md) — مسوّدة تعمل عليها القواعد كلها، والفهرس في [works/index.md](works/index.md).
+- [محاولة واحدة](works/one-attempt.md) — قصة قصيرة **مكتملة** بحالة `done`، اجتازت `lint` و`review --strict` و`check-contradictions`.
+- [النسخة الخطأ](works/night-copy.md) — مسوّدة `draft` من نفس العالم.
+
+الفهرس المولَّد: [works/index.md](works/index.md).

@@ -49,10 +49,11 @@ story/
 ├── works/             ← الإنتاج الفعلي، ملف لكل عمل أو مجلد لعمل طويل
 │   └── index.md       ← مولَّد آليًا؛ لا تحرّره يدويًا
 └── tools/
-    └── story.py       ← أدوات المستودع: new / lint / index / stats
+    └── story.py       ← الأدوات: new · lint · review · index · stats · check-contradictions
 ```
 
 **قواعد الملكية:**
+- `bible/style.md` هو مصدر قواعد `review`؛ قاعدة أسلوبية جديدة تُكتب هناك ثم تُبرمَج في الأدوات، لا العكس.
 - `bible/` يُحرَّر يدويًا، وأي تغيير فيه يستوجب تحديث الأعمال المتأثرة في نفس الدفعَة.
 - `works/index.md` مُولَّد. تعديله اليدوي يُكتب فوقه في المرة التالية.
 - لا ثنائيات ولا ملفات وسائط في المستودع؛ لا مخرجات بناء ولا `.venv` ولا `node_modules`.
@@ -88,7 +89,7 @@ updated: 2026-09-05
 |---|---|
 | `idea` → `draft` | يوجد ملخّص مكتوب، والحلقة الدرامية مرسومة في `## ملاحظات` |
 | `draft` → `revising` | المتن مكتمل حتى نهايته، ولا علامة عمل جارٍ (`TODO`) في البنية |
-| `revising` → `done` | `python3 tools/story.py lint` بلا أخطاء، و`tools/story.py check-contradictions` نظيف، وتحدّث `updated` |
+| `revising` → `done` | `story.py lint` بلا أخطاء، و`story.py review` بلا أخطاء، و`check-contradictions` نظيف، ثم تُحدَّث `updated` |
 
 عمل بحالة `done` لا يُعاد فتحه إلا بمحرّك: تغيير في `bible/`.
 

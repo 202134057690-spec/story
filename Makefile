@@ -2,12 +2,13 @@
 PY ?= python3
 STORY := $(PY) tools/story.py
 
-.PHONY: help lint strict index stats check test new clean-preview
+.PHONY: help lint strict index stats check test new review
 
 help:
 	@echo "أهداف مستودع story:"
 	@echo "  make lint            فحص الأعمال بقواعد AGENTS.md"
 	@echo "  make strict          الفحص مع اعتبار التنبيهات أخطاء"
+	@echo "  make review          فحص قواعد الأسلوب (bible/style.md)"
 	@echo "  make index           توليد works/index.md"
 	@echo "  make stats           إحصاءات موجزة"
 	@echo "  make check           lint + index + self-test (استعمله قبل التسليم)"
@@ -16,6 +17,9 @@ help:
 
 lint:
 	@$(STORY) lint
+
+review:
+	@$(STORY) review --strict
 
 strict:
 	@$(STORY) lint --strict
@@ -29,7 +33,7 @@ stats:
 test:
 	@$(STORY) self-test
 
-check: lint test
+check: lint review test
 	@$(STORY) index
 	@$(STORY) check-contradictions
 

@@ -435,6 +435,7 @@ def parse_facts() -> dict:
     return facts
 
 
+CONTRAST_MARKERS = re.compile(r"فقط|لكن\b|أمّا|اما\b|غير أن|بل ")
 ANTONYMS = [("لا يحب", "يحب"), ("لا تذكر", "تذكر"), ("لا تذكر", "يتذكر"),
             ("ميتين", "حيّ"), ("ينكر", "يعترف")]
 
@@ -465,17 +466,162 @@ def cmd_check_contradictions(args) -> int:
         paths += [os.path.join(bible_dir(), f) for f in sorted(os.listdir(bible_dir()))
                   if f.endswith(".md")]
     for path in paths:
-        text = read_text(path)
-        for neg, pos in ANTONYMS:
-            if neg in text and re.search(rf"(?<!لا ){re.escape(pos)}", text):
-                print(f"⚠ نقض محتمل في {rel(path)}: «{neg}» و«{pos}»")
-                problems += 1
+        for sentence in _prose_sentences(read_text(path).split("## المتن")[-1]):
+            if CONTRAST_MARKERS.search(sentence):
+                continue          # «تذكّر فقط» تضييد لا نقض
+            norm = normalize_ar(sentence)
+            for neg, pos in ANTONYMS:
+                if normalize_ar(neg) in norm and re.search(rf"(?<!لا ){re.escape(normalize_ar(pos))}", norm):
+                    print(f"⚠ نقض محتمل في {rel(path)}: «{neg}» و«{pos}» — «{sentence[:60]}…»")
+                    problems += 1
 
     if problems:
         print(f"\n{problems} نقطة مراجعة. صحّح bible/ أولًا ثم أعد التشغيل.")
         return 1
     print("لا تناقضات آلية مكتشفة. الكشف آلي ومتواضع، ولا يعوّض مراجعة بشرية.")
     return 0
+
+
+# ---------------------------------------------------------------- review ----
+# فحص آلي لمجموعة قواعد bible/style.md وAGENTS.md § 1. القواعد الأدبية
+# (رغبة/عائق/تحوّل، جودة الصورة) لا تُفحص آليًا: هذا الفحص بوابة دنيا لا حكم.
+
+CLICHES = ("قلبها يخفق", "قلبُها يخفق", "قلبها يدق", "زمن يتوقف", "زمنٌ يتوقّف",
+           "الوقت يتوقف", "دمعة تنساب", "دمعة تنسلّ", "ابتسامة صفراء",
+           "عيناها كالبحر", "ضحكة صافية", "صمت مطبق", "سكون الموت")
+EMOTION_TAGS = re.compile(
+    r"(?:قال(?:ت)?|أجاب(?:ت)?|ردّ(?:ت)?|سأل(?:ت)?|همس(?:ت)?|صاح(?:ت)?|اعترض(?:ت)?)\s+"
+    r"ب(?:حزن|غضب|حدّة|حدة|برودة|برود|هدوء|سخرية|ألم|الم|فخر|ارتجاف|ارتجاف|أسف|حسرة|"
+    r"خوف|فرح|ضيق|ضيقٍ|دهشة|استغراب|استهجان|نبرة|لهفة|رجاء|يأس|حزم|لين|رفق|قسوة|عجلة|تردد)")
+FILLERS = ("بشكل عام", "بشكل كبير", "في الواقع", "تجدر الإشارة", "من الجدير", "لا شك أن",
+           "قام بـ", "قام بتنفيذ", "يجدر بالذكر", "وكما هو معلوم")
+SIMILE_MARKERS = re.compile(r"كأنَّ?ما?\b|\bمثل[َة]?\s|\b(?:ي|ت)شبه\s|على هيئة")
+# مسافة قبل الفاصلة/السيميكولون العربي، أو ترقيم لاتيني بعد حرف عربي
+LATIN_PUNCT = re.compile(r"\s[،؛]|[\u0600-\u06ff]\s*[;?!]")
+SMALL_DIGIT = re.compile(r"(?<![\d٠-٩])[١-٩](?![\d٠-٩])")
+MORAL_TAIL = re.compile(r"وهكذا|(?:تعلمت|تعلّمت|أدركت|فهمت|اكتشفت)\s*أن")
+
+
+def _prose_sentences(text: str):
+    """تقسيم المتن إلى جُمل، مع الحفاظ على النقاط داخل الأرقام."""
+    text = re.sub(r"^---$", "", text, flags=re.M)
+    text = re.sub(r"[\u200b\u200e\u200f]", "", text)
+    protected = re.sub(r"(?<=\d)\.(?=\d)", "\u0000", text)
+    parts = re.split(r"(?<=[.!؟?\u061f…])\s+|\n+", protected)
+    out = []
+    for part in parts:
+        part = re.sub(r"(?<=\d)\u0000(?=\d)", ".", part).strip()
+        if len(words(part)) >= 1 and re.search(r"[\u0600-\u06ffA-Za-z]", part):
+            out.append(part)
+    return out
+
+
+def review_text(text: str, name: str):
+    """يعيد (errors, warnings, notes) لنصّ المتن."""
+    errors, warnings, notes = [], [], []
+    sentences = _prose_sentences(text)
+    if not sentences:
+        return ["لا جُمل في المتن لفحصها"], warnings, notes
+
+    for i, s in enumerate(sentences, 1):
+        n = len(words(s))
+        if n > 25:
+            warnings.append(f"جملة من {n} كلمة (> ٢٥) في الجملة {i}: {s[:60]}…")
+        for c in CLICHES:
+            if normalize_ar(c) in normalize_ar(s):
+                errors.append(f"كليشيه ممنوع في الجملة {i}: «{c}»")
+        if EMOTION_TAGS.search(s):
+            errors.append(f"وسم انفعال في الحوار بالجملة {i} — «قال بحزن» ممنوع، "
+                          f"استعمل فعلاً قبل القول: {s[:60]}…")
+        for f in FILLERS:
+            if f in s:
+                warnings.append(f"حشو «{f}» في الجملة {i}")
+        latin = LATIN_PUNCT.search(s)
+        if latin:
+            errors.append(f"ترقيم لاتيني أو مسافة خاطئة في الجملة {i}: «{latin.group(0)}» "
+                          f"— القاعدة: ، ؛ ؟ ! بلا مسافة قبلها")
+
+    if '"' in text:
+        errors.append("اقتباس مستقيم \"…\" في المتن — القاعدة: «…» للنقل الأدبي")
+    n_similes = len(SIMILE_MARKERS.findall(text))
+    budget = max(1, round(word_count(text) / 250))
+    if n_similes > budget:
+        warnings.append(f"{n_similes} تشبيهات والوارد {budget} تشبيه لكل ٢٥٠ كلمة")
+
+    smalls = SMALL_DIGIT.findall(text)
+    if smalls:
+        warnings.append(f"أرقام مفردة صغيرة {smalls[:6]} — حتى عشرة تُكتب بالحروف")
+
+    tail = sentences[-1]
+    if MORAL_TAIL.search(tail):
+        errors.append(f"الجملة الأخيرة تفسّر بدل أن تُصوّر: {tail[:70]}…")
+    if len(tail) > 0:
+        shown = tail[:70] + ("…" if len(tail) > 70 else "")
+        notes.append("الجملة الأخيرة: " + shown)
+    n_scenes = 1 + len(re.findall(r"^---$", text, re.M))
+    notes.append("%d جملة، %d كلمة، %d مشهد/لقطة" % (len(sentences), word_count(text), n_scenes))
+    return errors, warnings, notes
+
+
+def cmd_review(args) -> int:
+    files = work_files()
+    if args.slug:
+        files = [f for f in files
+                 if os.path.splitext(os.path.basename(f))[0] == args.slug]
+        if not files:
+            print(f"خطأ: لا عمل باسم slug: {args.slug}", file=sys.stderr)
+            return 2
+    if not files:
+        print("لا أعمال للفحص.")
+        return 0
+
+    n_errors = n_warnings = 0
+    for path in files:
+        try:
+            text = read_text(path)
+        except UnicodeDecodeError:
+            print(f"✗ {rel(path)}: ليس UTF-8")
+            n_errors += 1
+            continue
+        _, body, err = split_front_matter(text)
+        if err:
+            print(f"✗ {rel(path)}: {err} — صحّح المواصفة أولًا (story.py lint)")
+            n_errors += 1
+            continue
+        prose = section(body, "المتن")
+        errors, warnings, notes = review_text(prose, rel(path))
+        status = ""
+        m, _, _ = split_front_matter(text)
+        status = m.get("status", "?")
+        header = f"{rel(path)}  [{status}]"
+        if not errors and not warnings:
+            print(f"✓ {header} الأسلوب سليم")
+            if args.verbose:
+                for note in notes:
+                    print(f"    · {note}")
+            continue
+        print(("✗ " if errors else "! ") + header + " أسلوب")
+        for e in errors:
+            print(f"    خطأ أسلوب: {e}")
+        for wmsg in warnings:
+            print(f"    تنبيه أسلوب: {wmsg}")
+        if args.verbose:
+            for note in notes:
+                print(f"    · {note}")
+        n_errors += len(errors)
+        n_warnings += len(warnings)
+
+    if n_errors or (n_warnings and args.strict):
+        print(f"\n{review_code_note(n_errors, n_warnings, args.strict)}")
+        return 1
+    print(f"\nفحص الأسلوب: مقبول ({n_warnings} تنبيهًا لا يقطع التسليم).")
+    return 0
+
+
+def review_code_note(errors: int, warnings: int, strict: bool) -> str:
+    if strict:
+        return f"{errors} خطأ و{warnings} تنبيهًا — في strict التنبيهات تقطع التسليم."
+    return f"{errors} خطأ أسلوب و{warnings} تنبيهًا."
 
 
 # ------------------------------------------------------------- test ----
@@ -607,6 +753,37 @@ def cmd_self_test(args) -> int:
             with Capture() as cap:
                 rc = cmd_check_contradictions(argparse.Namespace())
             check("contradictions: rc=0 بلا حقائق متضاربة", rc == 0, f"rc={rc}")
+
+            # فاحص الأسلوب
+            e, w, n = review_text("قلبها يخفق وهي تنظر.", "x")
+            check("review: كليشيه = خطأ", any("كليشيه" in x for x in e), str(e))
+            e, w, n = review_text("قال بحزن: سأرحل.", "x")
+            check("review: وسم انفعال = خطأ", any("انفعال" in x for x in e), str(e))
+            e, w, n = review_text('قال "سأرحل" ثم خرج.', "x")
+            check("review: اقتباس لاتيني = خطأ", any("اقتباس" in x for x in e), str(e))
+            e, w, n = review_text("وهكذا تعلّمت أن الصبر مفتاح.", "x")
+            check("review: نهاية تفسّر = خطأ", any("تفسّر" in x for x in e), str(e))
+            e, w, n = review_text("خرج. " + "كلمة " * 30, "x")
+            check("review: جملة أطول من ٢٥ كلمة = تنبيه", any("كلمة (> ٢٥)" in x or "> ٢٥" in x for x in w), str(w)[:60])
+            e, w, n = review_text("خرج من البيت.", "x")
+            check("review: نص سليم بلا ملاحظات", not e and not w, str(e) + str(w))
+            e, w, n = review_text("نظر الي? ثم خرج.", "x")
+            check("review: ترقيم لاتيني = خطأ", any("ترقيم" in x for x in e), str(e))
+            e, w, n = review_text("جاء ٣ رجال.", "x")
+            check("review: رقم مفرد صغير = تنبيه", any("الحروف" in x for x in w), str(w)[:60])
+            e, w, n = review_text("كأنّه جبل. مثل حجر. يشبه نسمة. كأنّه ظل. مثل تراب.", "x")
+            check("review: ميزانية التشبيه تُخترق = تنبيه", any("تشبيه" in x for x in w), str(w)[:60])
+            sep = "\n\n---\n\n"
+            scenes = _prose_sentences("أ." + sep + "ب.")
+            check("review: فواصل المشاهد لا تُحسب جُملًا", scenes == ["أ.", "ب."], str(scenes))
+            e, w, n = review_text("كلمة ، أخرى.", "x")
+            check("review: مسافة قبل الفاصلة = خطأ", any("ترقيم" in x for x in e), str(e))
+            with Capture() as cap:
+                rc = cmd_review(argparse.Namespace(slug="test-story", strict=False, verbose=False))
+            check("review: rc=0 على عمل نظيف", rc == 0, cap.text().strip()[:70])
+            with Capture() as cap:
+                rc = cmd_review(argparse.Namespace(slug="غير-موجود", strict=False, verbose=False))
+            check("review: slug غير موجود = 2", rc == 2, f"rc={rc}")
             write_text(os.path.join(bible_dir(), "characters.md"),
                        "**بشر** — لا يكذب.\n**بشر** — يكذب دائمًا.\n")
             with Capture() as cap:
@@ -666,6 +843,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("stats", help="إحصاءات موجزة")
     sp.set_defaults(func=cmd_stats)
+
+    sp = sub.add_parser("review", help="فحص آلي لقواعد الأسلوب في bible/style.md")
+    sp.add_argument("slug", nargs="?", default="", help="عمل واحد؛ بلا slug = الكل")
+    sp.add_argument("--strict", action="store_true", help="التنبيهات تقطع التسليم")
+    sp.add_argument("-v", "--verbose", action="store_true", help="ملاحظات وإحصاءات")
+    sp.set_defaults(func=cmd_review)
 
     sp = sub.add_parser("check-contradictions", help="كشف تناقضات آلية في bible/")
     sp.set_defaults(func=cmd_check_contradictions)
