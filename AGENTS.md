@@ -50,6 +50,7 @@ story/
 │   └── index.md       ← مولَّد آليًا؛ لا تحرّره يدويًا
 └── tools/
     └── story.py       ← الأدوات: new · lint · review · index · stats · check-contradictions
+book/           ← الطبع: typeset.py · make_book.py · paratext.md · IMAGES.md
 ```
 
 **قواعد الملكية:**
@@ -123,7 +124,16 @@ updated: 2026-09-05
 
 ---
 
-## 7. الاختبار
+## 7أ. الطبع (`book/`)
+
+- الطباعة فرعٌ من المستودع لا نسخة موازية: `book/make_book.py` يقرأ `works/*.md`
+  و`book/paratext.md` فقط. يُمنع وجود «نصّ للطبع» محرَّرٍ في مكان آخر.
+- لا رسوم ولا PDF داخل git: الناتج في `~/build/book`، والرسوم في `~/build/art`،
+  وأوامر توليدها موثَّقة في `book/IMAGES.md`.
+- لا يُطبع عملٌ قبل أن يكون `done` ويجتاز `review --strict`.
+- كل طبعة تُخرِج `qa.json`؛ يُقرأ قبل التسليم ويُذكر ما لم يُتحقَّق منه.
+
+## 8. الاختبار
 
 أي تعديل على `tools/story.py` يستوجب:
 
