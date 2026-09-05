@@ -12,58 +12,47 @@ book/
 └── README.md      هذا الملف
 ```
 
-## أين يكون الناتج (وليس داخل git)
+## أين يكون الناتج
 
-المستودع يحفظ **مصدر** الطبعة لا **نتيجتها**: لا PDF ولا JPG ولا PNG تُلتَقَط
-في git — وإلا تضخّم التاريخ ما لا يُراجَع بالمقارنة (`AGENTS.md § 2`). الناتج
-يُكتب في `~/build/book/` افتراضًا، وتُغيّره بـ`--out`:
+الناتج **داخل المستودع** في `book/edition/`، والرسوم في `book/art/`، والخطّ في
+`book/fonts/` — فالمستودع هو مساحة العمل، وما يُكتب خارجه يضيع بتهيئة الصندوق
+(قد جرى ذلك فعلًا: بُنيت الطبعة أول أمرها في `~/build/` فمضى مع المحو).
 
 ```
-~/build/book/
-├── interior.pdf        المتن (صفحات مفردة بحجمها الصافي، بلا تراصّ)
-├── cover.pdf           spread واحد: خلف · كعب · أمام + نزيف ٣ مم
-├── pages/pNN.png       معاينة كل صفحة (دقّة --dpi-preview)
-├── cover-pages/…png    معاينة الغلاف
-├── sheet.png           الشيت الكلّي
-├── qa.json             القياسات المثبَّتة + «not_checked» صراحةً
-├── art/                النسخ المُعاد تحجيمها من الرسوم (JPEG 300dpi)
-└── Amiri-*.ttf         الخطّ المُضمَّن مخفَّفًا (subset)
+book/
+├── art/       cover.png · plate-1..4.png · tailpiece.png     ← مصدر الرسوم، ملتقَط
+├── fonts/     Amiri-Regular.ttf · Amiri-Bold.ttf (OFL)       ← لا تنزيل وقت البناء
+└── edition/   interior.pdf · cover.pdf · qa.json · sheet.png
+               pages/pNN.png · cover-pages/pNN.png            ← معاينة ١٥٠dpi
+               art/ · Amiri-*-book.ttf                         ← مُشتقَّات، غير ملتقَطة
 ```
 
-فإن أردتَ الناتج داخل المستودع (لِفتحِه بنقرةٍ من GitHub) استثنِ نوعين من
-`.gitignore` والتزم بحجمهما؛ لكنّ المقارنة النصّيّة حينها لا تعني شيئًا.
+تُغطّي `.gitignore` القاعدةَين معًا: تلغي استثناء الوسائط داخل هذه الأدلة الثلاث،
+وتُبقي المُشتَقَّين خارجًا لأنّ `make book` يعيدهما في ثانية.
 
-## التبعيات (الصندوق لا يملك أيًّا منها ابتداءً)
+## التبعيات
+
+الخطّ والرسوم محفوظان في المستودع، فلا تنزيل وقت البناء. يبقى ما يُثبَّت بـpip،
+وهو غير ملتقَط عمدا (`AGENTS.md § 2`) لأنّه حجمُ بيئةٍ لا حجمُ عمل:
 
 ```bash
-python3 -m venv ~/.venv-book && ~/.venv-book/bin/pip install \
-    reportlab uharfbuzz fonttools brotli pillow arabic-reshaper python-bidi
+make setup
+# = python3 -m venv .venv && ./.venv/bin/pip install -r book/requirements.txt
 ```
 
-الخطّ: أميري من حزمة npm عامة، بلا تنزيل مباشر من GitHub:
-
-```bash
-mkdir -p ~/build/fonts && cd /tmp
-url=$(curl -s https://registry.npmjs.org/@expo-google-fonts%2famiri \
-  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['versions'][d['dist-tags']['latest']]['dist']['tarball'])")
-curl -sL "$url" | tar xz -C /tmp && find /tmp/package -name '*.ttf' -exec cp {} ~/build/fonts/ \;
-```
-
-ترخيص أميري: SIL Open Font License 1.1 — الإضمين والتوزيع مشروعان.
-
-الرسوم لا تُخزَّن في المستودع (`AGENTS.md § 2`)؛ توضع في `~/build/art/*.png`:
-`cover.png`, `plate-1..4.png`, `tailpiece.png`. أوامر توليدها في `IMAGES.md`.
-
+ترخيص أميري: SIL Open Font License 1.1 — الإضمين والتوزيع مشروعان، ولذلك يُحفَظ
+الخطّ نفسُه في `book/fonts/` بدل الاعتماد على مصدرٍ خارجي وقت الطبع.
 ## التشغيل
 
 ```bash
-~/.venv-book/bin/python book/make_book.py --author "اسم المؤلِّف"
-# → ~/build/book/{interior.pdf,cover.pdf,pages/*.png,sheet.png,qa.json}
+make book AUTHOR="اسم المؤلِّف"
+# أو: ./.venv/bin/python book/make_book.py --author "اسم المؤلِّف"
+# → book/edition/{interior.pdf,cover.pdf,pages/*.png,cover-pages/*.png,sheet.png,qa.json}
 ```
 
 | الراية | المعنى |
 |---|---|
-| `--art DIR --fonts DIR --out DIR` | إعادة توجيه مجلدات البناء |
+| `--art DIR --fonts DIR --out DIR` | إعادة توجيه المجلدات (الافتراضي: `book/art`، `book/fonts`، `book/edition`) |
 | `--story PATH` | طبع عمل آخر من `works/` (يُقرأ `## المتن` وحده) |
 | `--dpi-preview N` | دقّة صور المعاينة (لا تمسّ الـPDF) |
 | `--no-cover` / `--png-only` | بلا غلاف / معاينة فقط بلا PDF |

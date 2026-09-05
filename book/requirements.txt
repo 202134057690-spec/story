@@ -1,0 +1,9 @@
+# بيئة الطبع — python3 -m venv .venv && ./.venv/bin/pip install -r book/requirements.txt
+# (الخطّ محفوظ في book/fonts، فلا تنزيل وقت البناء.)
+reportlab>=4
+uharfbuzz>=0.39
+fonttools>=4.50
+brotli
+pillow>=10
+arabic-reshaper
+python-bidi

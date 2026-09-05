@@ -1,0 +1,49 @@
+{
+  "title": "محاولة واحدة",
+  "story_file": "works/one-attempt.md",
+  "prose_words": 734,
+  "interior_pages": 16,
+  "glyph_ops": 4382,
+  "lines": 77,
+  "widows_moved": 0,
+  "overfull_pt": 0.0,
+  "loose_lines": 0,
+  "booklet_pad_pages": 2,
+  "art_dpi": {
+    "tailpiece.png": 892,
+    "plate-1.png": 261,
+    "plate-2.png": 267,
+    "plate-3.png": 261,
+    "plate-4.png": 267,
+    "cover.png": 261
+  },
+  "art_below_240dpi": {},
+  "cover": {
+    "spine_mm": 0.8,
+    "leaves": 8,
+    "w_mm": 302.8,
+    "h_mm": 216.0,
+    "bleed_mm": 3.0,
+    "cover_dpi": 261
+  },
+  "page_mm": [
+    148,
+    210
+  ],
+  "margins_mm": [
+    17,
+    17,
+    20,
+    18
+  ],
+  "fonts_embedded_subset": true,
+  "warnings": [
+    "الكعب 0.8 مم لـ8 ورقة: لا يتّسع لعنوان؛ طُبع خاليًا. للعنوان على الكعب يلزم ٦ مم على الأقل."
+  ],
+  "not_checked": [
+    "لا تحقيق تراصّ (imposition) لطابعة بعينها: الملف صفحات مفردة بحجمها الصافي",
+    "بلا ملف ICC ولا علامات قصّ — تُضاف عند المصنع",
+    "الرسوم توليد اصطناعي؛ حقوق الاستعمال التجاري على من يطبع",
+    "المراجعة البصرية: صفحة العنوان وأول المتن وبيانات الطبع على ٣٠٠dpi والغلاف على ٢٢٠dpi؛ وبقية الصفحات فُحصت آليًا فقط (تجاوز العمود، الفضفاضة، الأرقيم)"
+  ]
+}

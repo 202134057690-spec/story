@@ -8,7 +8,9 @@ venv/
 dist/
 build/
 
-# وسائط وثنائيات: هذا المستودع نصّي فقط (AGENTS.md § 2)
+# وسائط وثنائيات — المستودع هو مساحة العمل، فالطبعة كلُّها محفوظة فيه:
+# الرسوم المصدر، الخطّ، ملفّات PDF، ومعاينات الصفحات. المستثنى هنا هو
+# المُشتَقّ القابل لإعادة التوليد وحده: إعادة ترميز JPEG والخطّ المخفَّف.
 *.png
 *.jpg
 *.jpeg
@@ -19,6 +21,14 @@ build/
 *.mp4
 *.zip
 *.tar.gz
+!book/art/*.png
+!book/fonts/*.ttf
+!book/edition/*.pdf
+!book/edition/*.png
+!book/edition/pages/*.png
+!book/edition/cover-pages/*.png
+book/edition/art/
+book/edition/Amiri-*.ttf
 
 # محررات
 .vscode/

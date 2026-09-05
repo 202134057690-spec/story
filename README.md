@@ -59,18 +59,19 @@ book/       الطبع: typeset.py · make_book.py · paratext.md · IMAGES.md
 بيانات الطبع) في [book/paratext.md](book/paratext.md).
 
 ```bash
-make book AUTHOR="نجمة برهان"      # أو: ~/.venv-book/bin/python book/make_book.py --author ...
+make setup                        # بيئة الطبع (.venv داخل المستودع، غير ملتقَطة)
+make book AUTHOR="نجمة برهان"     # → book/edition/{interior,cover}.pdf
 ```
 
-**لا ملف PDF ولا صورة داخل git**: المستودع يحفظ النصّ والكود فقط
-([`AGENTS.md` § 2](AGENTS.md))، والناتج يُبنى خارجَه في `~/build/book/`:
+كلُّ ذلك محفوظ في المستودع نفسه — لا في مجلد مؤقَّت (`AGENTS.md § 2`):
 
 | الملف | المحتوى |
 |---|---|
-| `~/build/book/interior.pdf` | المتن — ١٦ صفحة A5، بلا علامات قصّ |
-| `~/build/book/cover.pdf` | غلاف مطوّيّ بوجهٍ واحد بنزيف ٣ مم |
-| `~/build/book/pages/` · `sheet.png` | معاينة كل صفحة + شيت كامل |
-| `~/build/book/qa.json` | ما ثُبِّت آليًا، وما لم يُثبَّت |
+| [book/edition/interior.pdf](book/edition/interior.pdf) | المتن — ١٦ صفحة A5، بلا علامات قصّ |
+| [book/edition/cover.pdf](book/edition/cover.pdf) | غلاف مطوّيّ بوجهٍ واحد بنزيف ٣ مم |
+| [book/edition/pages/](book/edition) · `sheet.png` | معاينة كل صفحة + شيت كامل |
+| [book/edition/qa.json](book/edition/qa.json) | ما ثُبِّت آليًا، وما لم يُثبَّت |
+| [book/art/](book/art) · [book/fonts/](book/fonts) | الرسوم مصدرًا، وأميري (OFL) |
 
 التفاصيل والتبعيات في [book/README.md](book/README.md)، وأوامر توليد الرسوم في
 [book/IMAGES.md](book/IMAGES.md).

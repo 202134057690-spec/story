@@ -293,12 +293,15 @@ def build_cover(cv: Canvas, shapers: dict, paratext: dict, title: str, author: s
 def main(argv=None) -> int:
     root = os.path.dirname(REPO)
     ap = argparse.ArgumentParser(description="تبويب «محاولة واحدة» — A5، أميري، HarfBuzz")
-    ap.add_argument("--out", default=os.environ.get("BOOK_OUT", os.path.join(root, "build", "book")))
-    ap.add_argument("--art", default=os.environ.get("BOOK_ART", os.path.join(root, "build", "art")))
-    ap.add_argument("--fonts", default=os.environ.get("BOOK_FONTS", os.path.join(root, "build", "fonts")))
+    # الناتج داخل المستودع: المستودع هو مساحة العمل، وكلُّ ما يُبنى يُحفَظ فيه.
+    # (كان البناء يكتب في ~/build خارج git، فضاع مع تهيئة الصندوق.)
+    ins = lambda var, sub: os.environ.get(var, os.path.join(REPO, "book", sub))
+    ap.add_argument("--out", default=ins("BOOK_OUT", "edition"))
+    ap.add_argument("--art", default=ins("BOOK_ART", "art"))
+    ap.add_argument("--fonts", default=ins("BOOK_FONTS", "fonts"))
     ap.add_argument("--story", default=os.path.join(REPO, "works", "one-attempt.md"))
     ap.add_argument("--author", default="اسم المؤلِّف")
-    ap.add_argument("--dpi-preview", type=float, default=180.0)
+    ap.add_argument("--dpi-preview", type=float, default=150.0)
     ap.add_argument("--no-cover", action="store_true")
     ap.add_argument("--png-only", action="store_true")
     args = ap.parse_args(argv)
@@ -310,8 +313,8 @@ def main(argv=None) -> int:
     if not os.path.exists(args.story):
         raise SystemExit(f"خطأ: لا ملف قصة: {args.story}")
 
-    shapers = {"R": Shaper(find_font(args.fonts, "*Amiri_400Regular.ttf", "*400Regular*.ttf"), "R"),
-               "B": Shaper(find_font(args.fonts, "*Amiri_700Bold.ttf", "*700Bold.ttf", "*700Bold*.ttf"), "B")}
+    shapers = {"R": Shaper(find_font(args.fonts, "Amiri-Regular.ttf", "*Amiri_400Regular.ttf", "*400Regular*.ttf"), "R"),
+               "B": Shaper(find_font(args.fonts, "Amiri-Bold.ttf", "*Amiri_700Bold.ttf", "*700Bold*.ttf"), "B")}
     warnings: list[str] = []
     paratext = load_paratext(os.path.join(HERE, "paratext.md"), args.author)
 

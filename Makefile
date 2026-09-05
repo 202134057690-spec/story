@@ -12,7 +12,7 @@ help:
 	@echo "  make index           توليد works/index.md"
 	@echo "  make stats           إحصاءات موجزة"
 	@echo "  make check           lint + review + index + self-test (استعمله قبل التسليم)"
-	@echo "  make book            توليد PDF الغلاف والمتن (يتطلّب ~/.venv-book)")
+	@echo "  make book            توليد PDF الغلاف والمتن داخل book/edition")
 	@echo "  make test            الاختبار الذاتي للأداة وحده"
 	@echo "  make new SLUG=x [FROM=chapter]  إنشاء عمل جديد"
 
@@ -42,8 +42,13 @@ new:
 	@test -n "$(SLUG)" || (echo "استعمل: make new SLUG=my-story [FROM=short-story|chapter|fragment]"; exit 2)
 	@$(STORY) new $(SLUG) --from $(if $(FROM),$(FROM),short-story)
 
-# الطبع: يستعمل بيئة التبويب إن وُجدت، وإلا يصرّح بالنقص بدل الصمت
-BOOKPY ?= $(HOME)/.venv-book/bin/python
+# الطبع: بيئة التبويب داخل المستودع (.venv، غير ملتقَطة في git)
+BOOKPY ?= $(CURDIR)/.venv/bin/python
+setup:            ## إنشاء بيئة الطبع وتثبيت اعتمادياتها
+	@test -d .venv || python3 -m venv .venv
+	./.venv/bin/pip install -q --disable-pip-version-check -r book/requirements.txt
+	@echo "البيئة جاهزة: .venv — شغّل make book"
+
 book:
-	@test -x "$(BOOKPY)" || { echo "تنبيه: أنشئ بيئة التبويب أولًا (انظر book/README.md)"; exit 3; }
+	@test -x "$(BOOKPY)" || { echo "تنبيه: لا بيئة طبع — شغّل make setup أولًا"; exit 3; }
 	"$(BOOKPY)" book/make_book.py $(if $(AUTHOR),--author "$(AUTHOR)",)
