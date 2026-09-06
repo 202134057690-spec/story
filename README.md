@@ -24,9 +24,13 @@ python3 tools/story.py lint && python3 tools/story.py index
 | `tools/story.py review [--strict]` | فحص آلي لقواعد الأسلوب: جُمل طويلة، كليشيهات، وسوم انفعال، ترقيم لاتيني، ميزانية التشبيه |
 | `tools/story.py stats` | إجماليات سريعة |
 | `tools/story.py check-contradictions` | كشف التعارض بين «الحقائق» المسجّلة في `bible/` |
-| `tools/story.py self-test` | ٤٤ فحصًا ذاتيًا للأداة نفسها — شغّله بعد أي تعديل عليها |
+| `tools/story.py constraints` | عقدُ العالم: الممنوعاتُ والقيودُ والفصول من `bible/world.md` على المتن |
+| `tools/story.py sweep [--strip-controls]` | تلوّثُ الحروف: CJK، لاتينيّةٌ في المتن، تحكّماتُ اتجاهٍ خفيّة |
+| `tools/story.py debts [--gate]` | دفترُ الدُّيون السرديّة وحالتُها ومَن يُجيب عنها |
+| `tools/check_qa.py [--a A --b B]` | تصديقُ `qa.json` ومقارنةُ قياسَي بناءَين |
+| `tools/story.py self-test` | ٦٦ فحصًا ذاتيًا للأداة نفسها — شغّله بعد أي تعديل عليها |
 
-بلا اعتماديات: Python 3.8+ فقط. أو اختصارات عبر `make` (`make lint`, `make review`, `make new SLUG=x`, `make check`).
+بلا اعتماديات للطباعةِ النصّيّة: Python 3.8+ فقط. الطبعُ يحتاج `make setup`. أو اختصارات عبر `make` (`make lint`, `make review`, `make new SLUG=x`, `make check`).
 
 ## البنية
 
@@ -47,6 +51,7 @@ book/       الطبع: typeset.py · make_book.py · paratext.md · IMAGES.md
 
 ## الحالة الحالية
 
+- البواباتُ كلُّها في جدول [AGENTS.md § 7](AGENTS.md)؛ `make check` يشغّل النصّيّةَ منها و`make check-full` يزيد فحصَ المحرّك وطبعةً كاملة.
 - [محاولة واحدة](works/one-attempt.md) — قصة قصيرة **مكتملة** بحالة `done`، اجتازت `lint` و`review --strict` و`check-contradictions`.
 - [النسخة الخطأ](works/night-copy.md) — مسوّدة `draft` من نفس العالم.
 
@@ -60,7 +65,8 @@ book/       الطبع: typeset.py · make_book.py · paratext.md · IMAGES.md
 
 ```bash
 make setup                        # بيئة الطبع (.venv داخل المستودع، غير ملتقَطة)
-make book AUTHOR="نجمة برهان"     # → book/edition/{interior,cover}.pdf
+make book AUTHOR="نجمة برهان"                                  # → book/edition/{interior,cover}.pdf
+make book AUTHOR="نجمة برهان" FLAGS="--impose --spine-mm 9"    # + صفحات طابعة وكعبٌ متّسع
 ```
 
 كلُّ ذلك محفوظ في المستودع نفسه — لا في مجلد مؤقَّت (`AGENTS.md § 2`):

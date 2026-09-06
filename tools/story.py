@@ -25,6 +25,14 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 TYPES = ("short-story", "chapter", "fragment")
+# فحوصُ الالتزام (sweep · debts · constraints) في ملفٍّ مجاور، فواجهةُ الأوامر واحدة
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import contract                      # tools/contract.py
+except ImportError:                       # pragma: no cover — ملفٌّ ناقش لا انهيار
+    contract = None
+
+
 STATUSES = ("idea", "draft", "revising", "done")
 REQUIRED_KEYS = ("title", "slug", "type", "status", "created", "updated")
 STATUS_ORDER = {s: i for i, s in enumerate(STATUSES)}
@@ -656,6 +664,28 @@ class Capture:
         return False
 
 
+def _need_contract():
+    if contract is None:
+        print("خطأ: tools/contract.py مفقود — بوابات sweep/debts/constraints معطّلة.",
+              file=sys.stderr)
+        raise SystemExit(2)
+
+
+def cmd_sweep(args) -> int:
+    _need_contract()
+    return contract.cmd_sweep(args)
+
+
+def cmd_debts(args) -> int:
+    _need_contract()
+    return contract.cmd_debts(args)
+
+
+def cmd_constraints(args) -> int:
+    _need_contract()
+    return contract.cmd_constraints(args)
+
+
 def cmd_self_test(args) -> int:
     failures = []
 
@@ -803,6 +833,11 @@ def cmd_self_test(args) -> int:
                   fact_slot("لا يحبّ البحر")[1] is True and fact_slot("يحبّ البحر")[1] is False)
             check("normalize_ar: التشكيل والهمزة لا يغيّران المقارنة",
                   normalize_ar("تَحفظُ الأرقامَ") == normalize_ar("تحفظ الارقام"))
+
+            if contract is not None:
+                contract.self_test(check)
+            else:
+                check("contract.py بجانب الأدوات", contract is not None)
     finally:
         ROOT = real_root
 
@@ -852,6 +887,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("check-contradictions", help="كشف تناقضات آلية في bible/")
     sp.set_defaults(func=cmd_check_contradictions)
+
+    sp = sub.add_parser("sweep", help="تلوّث الحروف: CJK/لاتينيّةٌ في المتن/تحكّماتٌ خفيّة")
+    sp.add_argument("--json", action="store_true", help="للآليّات وCI")
+    sp.add_argument("--strip-controls", action="store_true",
+                    help="شطبُ التحكّمات الخفيّة من الملفات محلّيًا (اكتب بعد التأكّد)")
+    sp.set_defaults(func=cmd_sweep)
+
+    sp = sub.add_parser("debts", help="دفتر الدُّيون السردية (bible/plot.md + ملاحظات الأعمال)")
+    sp.add_argument("--json", action="store_true")
+    sp.add_argument("--gate", action="store_true",
+                    help="دَينٌ مفتوح في عملٍ done = فشل (يُغلَق أو يُحال صراحةً)")
+    sp.set_defaults(func=cmd_debts)
+
+    sp = sub.add_parser("constraints", help="فصلُ المتن على عقد bible/world.md")
+    sp.add_argument("slug", nargs="?", default="", help="عملٌ واحد؛ بلا slug = الكل")
+    sp.add_argument("--json", action="store_true", help="طباعة ما قرأه من bible/ بدل الفحص")
+    sp.set_defaults(func=cmd_constraints)
 
     sp = sub.add_parser("self-test", help="اختبار الأدوات ذاتها")
     sp.set_defaults(func=cmd_self_test)

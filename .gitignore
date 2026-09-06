@@ -27,6 +27,8 @@ build/
 !book/edition/*.png
 !book/edition/pages/*.png
 !book/edition/cover-pages/*.png
+!book/edition/press-pages/*.png
+!book/edition/interior-spreads.pdf
 book/edition/art/
 book/edition/Amiri-*.ttf
 

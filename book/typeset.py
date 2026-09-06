@@ -181,7 +181,14 @@ def _script_runs(part: str):
 
 
 def shape_units(shapers: dict, text: str, size: float, font: str):
-    """وحدات السطر: كل وحدة = قطع متلاصقة، والمسافات بين الوحدات لا داخلها."""
+    """وحدات السطر: كل وحدة = قطع متلاصقة، والمسافات بين الوحدات لا داخلها.
+
+    رصّ القطع داخل الوحدة يجري دائمًا من اليمين إلى اليسار: هذا المحرّك
+    أحاديّ الاتجاه — فقرةُ الكتاب كلِّها عربيّة، فأوّلُ المنطق أقصى اليمين،
+    ولو رُصَّت القطعُ يسارًا لانقلبت الفاصلةُ تحت الكلمةِ الخطأ ولصار
+    «(س» «س)». أمّا داخل القطعة فالاتجاهُ للُّغة نفسها: اللاتينيُّ والأرقام
+    يُقرأان من اليسار، وهذا يُحدَّد عند التشكيل لا عند الرصّ.
+    """
     units = []
     for raw in [w for w in re.split(r"\s+", text.strip()) if w]:
         pieces = []
@@ -210,11 +217,13 @@ def place_units(units, gap: float, right: float, baseline: float, font: str, siz
     ops, cursor = [], right
     for u in units:
         x_left = cursor - u["w"]          # الحافّة اليُسرى للوحدة؛ اليُمنى معروفة
-        gx = x_left
+        gx = cursor                       # أوّلُ المنطق أقصى اليمين
         for p in u["pieces"]:
+            x = gx - p["w"]
             for ch, adv, xo, yo in p["g"]:
-                ops.append(("g", font, ch, gx + xo, baseline + yo, size, ink))
-                gx += adv
+                ops.append(("g", font, ch, x + xo, baseline + yo, size, ink))
+                x += adv                  # وداخلَ القطعةِ يسارًا، بلغةِ القطعة
+            gx -= p["w"]
         cursor = x_left - gap             # ثم مسافة، فالوحدة التالية إلى يسارها
     return ops, content, loose
 
@@ -293,8 +302,8 @@ class Flow:
         self.margin, self.top, self.bottom, self.width = margin, top, bottom, width
         self.page = cv.page() if start_page is None else start_page
         self.y, self.lead = top, None
-        self.stats = {"lines": 0, "pages": 0, "overfull": 0.0,
-                      "widows_moved": 0, "loose_lines": 0, "longest_line": 0.0}
+        self.stats = {"lines": 0, "pages": 0, "overfull": 0.0, "widows_moved": 0,
+                      "orphans_fixed": 0, "loose_lines": 0, "longest_line": 0.0}
 
     # — الصفحات —
     def new_page(self) -> int:
@@ -338,6 +347,23 @@ class Flow:
                 used += add
         if cur:
             lines.append((cur, indent if len(lines) == 0 else 0.0))
+        # يتيمةُ الكلمة: لا يجوز أن تُنهِيَ فقرةً بكلمةٍ وحدها تحت سطرٍ ممتلئ.
+        # تُسحب كلمةٌ من السطر السابق ما دام الاتّساعُ باقيًا — وهذه قاعدةُ طباعة،
+        # لا ذوق: السطرُ ذي الكلمة الواحدة يبدو خطأً مطبعيًا ولو كان صحيحًا.
+        while len(lines) >= 2 and len(lines[-1][0]) == 1:
+            p_units = lines[-2][0]
+            if len(p_units) < 2:
+                break
+            moved = p_units[-1]
+            prev_w = sum(u["w"] for u in p_units) + gap * (len(p_units) - 1)
+            last_w = lines[-1][0][0]["w"]
+            if prev_w - moved["w"] - gap > self.width + 0.01 or \
+                    last_w + moved["w"] + gap > self.width + 0.01:
+                break
+            lines[-2] = (p_units[:-1], lines[-2][1])
+            lines[-1] = ([moved] + lines[-1][0], lines[-1][1])
+            self.stats["orphans_fixed"] += 1
+
         # أرملة سطرٍ واحد: انقل السطرين معًا
         if len(lines) > 2 and self.y + lead * 2 > self.bottom:
             self.new_page()

@@ -235,9 +235,13 @@ def build_body(cv: Canvas, shapers: dict, story_path: str, paratext: dict,
 
 # --------------------------------------------------------------- الغلاف ----
 def build_cover(cv: Canvas, shapers: dict, paratext: dict, title: str, author: str,
-                art_dir: str, out_dir: str, body_pages: int, warnings: list) -> dict:
+                art_dir: str, out_dir: str, body_pages: int, warnings: list,
+                spine_override: float = 0.0, spine_text_override: str = "") -> dict:
     leaves = math.ceil(body_pages / 2)
-    spine_mm = round(leaves * 0.10, 2)             # ورق ٨٠جم غير مطلي
+    spine_mm = round(spine_override, 2) if spine_override > 0 else round(leaves * 0.10, 2)
+    if spine_override > 0:
+        warnings.append(f"كعبٌ مفروضٌ يدويًّا: {spine_mm} مم بدل المحسوب "
+                        f"{round(leaves * 0.10, 2)} مم (ورق ٨٠جم، {leaves} ورقة).")
     spine = spine_mm * MM
     W, H = PAGE_W * 2 + spine + 2 * BLEED, PAGE_H + 2 * BLEED
     cv.w, cv.h = W, H
@@ -278,15 +282,127 @@ def build_cover(cv: Canvas, shapers: dict, paratext: dict, title: str, author: s
         warnings.append(f"الكعب {spine_mm} مم لـ{leaves} ورقة: لا يتّسع لعنوان؛ "
                         "طُبع خاليًا. للعنوان على الكعب يلزم ٦ مم على الأقل.")
     else:
-        spine_text = paratext.get("الكعب", "").replace("\n", " · ")
-        draw_line(cv, p, shapers, spine_text, 9.0, "R",
-                  cx=BLEED + PAGE_W + spine / 2, baseline=BLEED + PAGE_H / 2)
+        spine_text = (spine_text_override or paratext.get("الكعب", "")).replace("\n", " · ").strip()
+        spine_drawn = False
+        if spine_text:
+            n = draw_spine_stack(cv, p, shapers, spine_text,
+                                 cx=BLEED + PAGE_W + spine / 2,
+                                 top=BLEED + 12 * MM, bottom=BLEED + PAGE_H - 12 * MM)
+            if n is None:
+                warnings.append("الكعبُ ضيّقٌ على عنوانه: طُبع خاليًا مع اتّساعٍ كافٍ — "
+                                "قلّل النصَّ في book/paratext.md § الكعب.")
+            else:
+                spine_drawn = True
     if len(cv.pages) != 1:
         warnings.append(f"الغلاف طُبِع على {len(cv.pages)} صفحات بدل واحدة؛ "
                         "قلّل نص الغلاف الخلفي أو صغّر خطّه.")
     return {"spine_mm": spine_mm, "leaves": leaves, "w_mm": round(W / MM, 1),
             "h_mm": round(H / MM, 1), "bleed_mm": round(BLEED / MM, 1),
-            "cover_dpi": q[3]}
+            "cover_dpi": q[3], "spine_has_title": bool(spine_mm >= 6 and spine_drawn)}
+
+
+def draw_spine_stack(cv, page, shapers, text: str, size: float = 8.4, *,
+                     cx: float, top: float, bottom: float):
+    """حرفٌ تحت حرف على الكعب — لا تدويرَ ولا قلب: كذلك تُطبع الأكعاب.
+
+    كلُّ حرفٍ يُشكَّل وحده فيأخذ صورته المفردة، والكلماتُ تُفصل ببياضٍ ضئيل.
+    يعيد عددَ المحارف المرسومة، أو None إن لم يتّسع الكعبُ للنصّ.
+    """
+    letters = [c for c in text if not c.isspace()]
+    sep = len([c for c in text if c.isspace()])
+
+    def step_for(s):
+        return max(shapers["B"].width("ب", s), s * 1.28)
+
+    step = step_for(size)
+    room = bottom - top
+    while size > 5.2 and len(letters) * step + sep * size * 0.42 > room:
+        size *= 0.94
+        step = step_for(size)
+    if len(letters) * step + sep * size * 0.42 > room:
+        return None
+    # توسيطٌ رأسيّ: لا يُترَك الكعبُ نصفُه فارغًا تحت العنوان
+    need = len(letters) * step + sep * size * 0.42
+    y = top + (room - need) / 2 + step / 2
+    idx = 0
+    for c in text:
+        if c.isspace():
+            y += size * 0.42
+            continue
+        glyphs, w = shapers["B"].shape_rtl(c, size, True)
+        for gi, adv, xo, yo in glyphs:
+            cv.glyph("B", gi, cx - (w / 2) + xo, y + yo, size, "#141414")
+        idx += 1
+        y += step
+    return idx
+
+
+# ---------------------------------------------------------------- تراصّ ----
+def _shift(op, dx: float, dy: float):
+    """إزاحةُ مشغّلٍ إلى موضعه على صفحة الطابعة. الأنواعُ أربعة لا خامس لها."""
+    k = op[0]
+    if k == "g":                                  # ("g", font, ch, x, y, size[, ink])
+        rest = list(op[6:]) or ["#141414"]
+        return ("g", op[1], op[2], op[3] + dx, op[4] + dy, op[5], rest[0])
+    if k == "i":                                  # ("i", path, x, y, w, h)
+        return ("i", op[1], op[2] + dx, op[3] + dy, op[4], op[5])
+    if k == "r":                                  # ("r", x, y, w, thick, ink) أفقي
+        return ("r", op[1] + dx, op[2] + dy, op[3], op[4], op[5])
+    if k == "b":                                  # ("b", x, y, w, h, fill)
+        return ("b", op[1] + dx, op[2] + dy, op[3], op[4], op[5])
+    raise ValueError(f"مشغّلٌ مجهول: {k}")
+
+
+def build_sheets(src_cv, out_pdf: str, fonts: dict, marks: bool = True,
+                 preview_dir: str = "", preview_dpi: float = 150.0) -> dict:
+    """كُرّاسٌ بدبّاسة: صفحةُ الطابعة = ورقتان من الكتاب جنبًا إلى جنب.
+
+    ترتيبُ الأزواج (خارج→داخل) لكتابٍ يُمطى من اليمين:
+        (الأخيرة|الأولى) (الثانية|قبلَ الأخيرة) …
+    وهو ترتيبُ الورقةِ المطويّة، لا ترتيبُ القراءة: الصفحةُ الأُولى يمينًا لأن
+    الغلافَ الأماميَّ في الكتب العربيّة على اليمين. العلاماتُ أفقية/عموديّة
+    بسمك ٠٫٣pt عند خطّ القصّ، وتُرسَم داخل منطقة النزيف وحدها.
+    """
+    n = len(src_cv.pages)
+    if n % 4:
+        raise ValueError(f"عددُ الصفحات {n} ليس مضاعفَ أربعة؛ الحشوُ واجبٌ قبل التراصّ.")
+    sheet_w, sheet_h = 2 * PAGE_W + 2 * BLEED, PAGE_H + 2 * BLEED
+    cv = T.Canvas(sheet_w, sheet_h)
+    pairs = []
+    for i in range(n // 2):
+        left = (n - i) if i % 2 == 0 else (i + 1)
+        right = (i + 1) if i % 2 == 0 else (n - i)
+        pairs.append((left, right))
+        p = cv.page()
+        for slot, num in ((0, left), (1, right)):
+            dx = BLEED + slot * PAGE_W
+            dy = BLEED
+            for op in src_cv.pages[num - 1]:
+                cv.pages[p].append(_shift(op, dx, dy))
+        if marks:
+            # طولُ العلامة ٦مم، وفجوةُ القصّ ١٫٦مم، والسُّمك ٠٫٣ — على مواضع القصّ
+            # الثلاثة أفقيًّا والخطَّين رأسيًّا، كلُّها داخل منطقة النزيف.
+            ink, m, cut, th = "#000000", 6.0, 1.6, 0.3
+            for x in (BLEED, BLEED + PAGE_W, BLEED + 2 * PAGE_W):
+                for y in (BLEED, BLEED + PAGE_H):
+                    if 0.1 < x - BLEED < 2 * PAGE_W - 0.1:      # خطٌّ داخليّ: أفقيّ فقط
+                        cv.rect(x - m, y - th / 2, m - cut, th, ink, page=p)
+                        cv.rect(x + cut, y - th / 2, m - cut, th, ink, page=p)
+                    else:
+                        cv.rect(x - cut, y - th / 2, m - cut, th, ink, page=p)
+                        cv.rect(x - m - cut, y - th / 2, m - cut, th, ink, page=p)
+                    cv.rect(x - th / 2, y - m, th, m - cut, ink, page=p)
+                    cv.rect(x - th / 2, y + cut, th, m - cut, ink, page=p)
+            # ثنيةُ المنتصف: خِتمان رماديّان قصيران خارج خطّ القصّ
+            for yy in (0.0, sheet_h - (BLEED - cut)):
+                cv.rect(BLEED + PAGE_W - th / 2, yy, th, BLEED - cut, "#8a8a8a", page=p)
+    T.render_pdf(cv, out_pdf, fonts, label="spreads")
+    if preview_dir:
+        T.render_png(cv, preview_dir, fonts, dpi=preview_dpi)
+    return {"sheets": n // 4, "press_pages": n // 2, "pair_order": pairs,
+            "sheet_mm": [round(sheet_w / MM, 1), round(sheet_h / MM, 1)],
+            "crop_marks": bool(marks)}
+
 
 
 # ------------------------------------------------------------------ CLI ----
@@ -303,6 +419,12 @@ def main(argv=None) -> int:
     ap.add_argument("--author", default="اسم المؤلِّف")
     ap.add_argument("--dpi-preview", type=float, default=150.0)
     ap.add_argument("--no-cover", action="store_true")
+    ap.add_argument("--impose", action="store_true",
+                    help="صفحاتُ طابعةٍ مزدوجة (كُرّاس بدبّاسة) في interior-spreads.pdf")
+    ap.add_argument("--no-marks", action="store_true", help="بلا علامات قصٍّ عند التراصّ")
+    ap.add_argument("--spine-mm", type=float, default=0.0,
+                    help="عرضُ كعبٍ مفروضٌ بدل المحسوب (للتجربة على ورقٍ أسمك)")
+    ap.add_argument("--spine-text", default="", help="عنوانٌ على الكعب إن اتّسع له الكعب")
     ap.add_argument("--png-only", action="store_true")
     args = ap.parse_args(argv)
 
@@ -319,12 +441,15 @@ def main(argv=None) -> int:
     paratext = load_paratext(os.path.join(HERE, "paratext.md"), args.author)
 
     body = Canvas(PAGE_W, PAGE_H)
+    spreads = None
     info = build_body(body, shapers, args.story, paratext, args.art, args.out, warnings)
     cover_cv, cover_info = None, {}
     if not args.no_cover:
         cover_cv = Canvas(PAGE_W * 2, PAGE_H)   # يُعاد ضبطه داخل build_cover
         cover_info = build_cover(cover_cv, shapers, paratext, info["title"],
-                                 args.author, args.art, args.out, info["pages"], warnings)
+                                 args.author, args.art, args.out, info["pages"], warnings,
+                                 spine_override=args.spine_mm,
+                                 spine_text_override=args.spine_text)
 
     # الخطّان المعاد ربطهما: بعد اكتمال كل التشكيل (شرطٌ لا اختيار)
     fonts = {}
@@ -340,6 +465,14 @@ def main(argv=None) -> int:
                     cols=5, thumb_w=300)
     if not args.png_only:
         T.render_pdf(body, os.path.join(args.out, "interior.pdf"), fonts, label=info["title"])
+        if args.impose:
+            spreads = build_sheets(body, os.path.join(args.out, "interior-spreads.pdf"),
+                                   fonts, marks=not args.no_marks,
+                                   preview_dir=os.path.join(args.out, "press-pages"),
+                                   preview_dpi=args.dpi_preview)
+            print(f"التراصّ: {spreads['sheets']} أوراق ({spreads['press_pages']} صفحة طابعة "
+                  f"{spreads['sheet_mm'][0]}×{spreads['sheet_mm'][1]} مم) · "
+                  f"علامات قصّ: {'نعم' if spreads['crop_marks'] else 'لا'}")
         if cover_cv is not None:
             T.render_pdf(cover_cv, os.path.join(args.out, "cover.pdf"), fonts, label="cover")
             T.render_png(cover_cv, os.path.join(args.out, "cover-pages"), fonts, dpi=args.dpi_preview)
@@ -348,20 +481,35 @@ def main(argv=None) -> int:
     if cover_info:
         art_dpi["cover.png"] = cover_info["cover_dpi"]
     low = {k: v for k, v in art_dpi.items() if isinstance(v, (int, float)) and v < 240}
-    qa = {"title": info["title"], "story_file": os.path.relpath(args.story, REPO),
+    # ما بُنِيَ به هذا الملف بالضبط: المقارنةُ بين بناءَين بلا هذه القيود
+    # تُخطِئ لمجرّد اختلافِ اسمٍ على صفحة العنوان.
+    qa_args = {"author": args.author, "story": os.path.relpath(args.story, REPO),
+               "cover": not args.no_cover, "impose": bool(args.impose),
+               "spine_mm": round(float(args.spine_mm or 0.0), 2),
+               "spine_text": args.spine_text or ""}
+    qa = {"build_args": qa_args,
+          "title": info["title"], "story_file": os.path.relpath(args.story, REPO),
           "prose_words": info["words"], "interior_pages": info["pages"],
           "glyph_ops": body.total_glyphs(), "lines": info["flow"]["lines"],
           "widows_moved": info["flow"]["widows_moved"],
           "overfull_pt": round(info["flow"]["overfull"], 2),
+          "orphans_fixed": info["flow"]["orphans_fixed"],
           "loose_lines": info["flow"].get("loose_lines", 0),
           "booklet_pad_pages": info["booklet_pad"],
           "art_dpi": art_dpi, "art_below_240dpi": low,
           "cover": cover_info, "page_mm": [148, 210],
           "margins_mm": [17, 17, 20, 18], "fonts_embedded_subset": True,
+          "imposition": spreads or {"requested": False,
+                                     "note": "أضِف --impose لصفحاتِ طابعةٍ مزدوجة (كُرّاس بدبّاسة)"},
           "warnings": warnings,
           "not_checked": [
-              "لا تحقيق تراصّ (imposition) لطابعة بعينها: الملف صفحات مفردة بحجمها الصافي",
-              "بلا ملف ICC ولا علامات قصّ — تُضاف عند المصنع",
+              ("التراصُّ بـ--impose كُرّاسٌ بدبّاسةٍ لا بلايت: لا مَيلَ ولا comp-sets، "
+               "ولا صفحاتٍ لاصقة، وغيرُ مضبوطٍ لطابعةٍ بعينها" if spreads else
+               "لا تحقيق تراصّ: الملفُّ صفحاتٌ مفردةٌ بحجمها الصافي — شغّل --impose "
+               "لصفحاتٍ مزدوجة (كُرّاس بدبّاسة)"),
+              ("علاماتُ القصّ رسمٌ عند خطّ القصّ لا صناديقُ PDF (TrimBox/BleedBox)، "
+               "والـICC غائب — كلاهما عند المصنّع" if (spreads and spreads.get("crop_marks"))
+               else "بلا ملف ICC ولا علامات قصّ — تُضاف عند المصنّع"),
               "الرسوم توليد اصطناعي؛ حقوق الاستعمال التجاري على من يطبع",
               "المراجعة البصرية: صفحة العنوان وأول المتن وبيانات الطبع على ٣٠٠dpi والغلاف على ٢٢٠dpi؛ "
               "وبقية الصفحات فُحصت آليًا فقط (تجاوز العمود، الفضفاضة، الأرقيم)"]}
@@ -377,8 +525,9 @@ def main(argv=None) -> int:
     print(f"دقّة الرسوم dpi: {json.dumps(info['dpi'], ensure_ascii=False)}")
     if cover_info:
         print(f"دقّة غلاف: {cover_info.get('cover_dpi')} dpi · أسطر فضفاضة: "
-              f"{info['flow'].get('loose_lines', 0)} · سطر مُتجاوز: "
-              f"{info['flow'].get('overfull', 0):.2f}pt")
+          f"{info['flow'].get('loose_lines', 0)} · سطر مُتجاوز: "
+          f"{info['flow'].get('overfull', 0):.2f}pt · يتيمة مُصلَحة: "
+          f"{info['flow'].get('orphans_fixed', 0)}")
     print(f"الناتج: {args.out}")
     for w in warnings:
         print("تنبيه:", w)

@@ -1,0 +1,66 @@
+name: بوابات المستودع
+
+# لا شيءَ يُدفَع هنا إلى git — هذا فحصٌ فقط. الطبعةُ محفوظةٌ في الفرع،
+# فالفحصُ يقارن ما هو كائن بما يدّعيه qa.json.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  text:
+    name: النصّ والأسلوبُ والعقد
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: بواباتٌ بلا اعتماديات
+        run: |
+          python3 tools/story.py lint --strict
+          python3 tools/story.py review --strict
+          python3 tools/story.py constraints
+          python3 tools/story.py sweep
+          python3 tools/story.py debts --gate
+          python3 tools/story.py self-test
+          python3 tools/story.py check-contradictions
+          python3 tools/story.py index --dry-run > /dev/null
+
+      - name: الطبعةُ محفوظةٌ ومقاساتُها صادقة
+        run: |
+          test -f book/edition/interior.pdf
+          test -f book/edition/cover.pdf
+          test -f book/edition/qa.json
+          python3 tools/check_qa.py
+
+  typesetting:
+    name: المحرّكُ وإعادةُ بناءٍ مطابقة
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: بيئةُ الطبع
+        run: make setup
+
+      - name: فحصُ المحرّك
+        run: make test-book
+
+      - name: إعادةُ البناء في مؤقّتٍ ومقارنةُ القياسات
+        run: |
+          mkdir -p /tmp/rebuild
+          ./.venv/bin/python book/make_book.py --author "نجمة برهان" \
+              --out /tmp/rebuild --dpi-preview 90 --no-cover
+          python3 tools/check_qa.py --a /tmp/rebuild/qa.json --b book/edition/qa.json
+
+      - name: معاينةُ صفحات الطابعة
+        uses: actions/upload-artifact@v4
+        with:
+          name: edition-preview
+          path: book/edition/press-pages/*.png
+        if: always()
